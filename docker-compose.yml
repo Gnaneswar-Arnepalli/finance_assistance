@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  streamlit:
+    build: .
+    ports:
+      - "8501:8501"
+
+  api_agent:
+    build: ./agents
+    command: uvicorn api_agent:app --host 0.0.0.0 --port 8001
+    ports:
+      - "8001:8001"
+
+  orchestrator:
+    build: ./orchestrator
+    command: uvicorn main:app --host 0.0.0.0 --port 8010
+    ports:
+      - "8010:8010"
