@@ -11,4 +11,5 @@ streamlit-float
 pyttsx3
 yfinance
 unstructured
-beautifulsoup4 requests
+beautifulsoup4 
+requests
