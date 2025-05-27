@@ -13,3 +13,6 @@ yfinance
 unstructured
 beautifulsoup4 
 requests
+choco 
+ffmpeg
+scipy
