@@ -9,3 +9,6 @@ python-dotenv
 audio-recorder-streamlit
 streamlit-float
 pyttsx3
+yfinance
+unstructured
+beautifulsoup4 requests
