@@ -1,0 +1,11 @@
+openai
+streamlit
+torch
+openai-whisper
+google-generativeai
+ffmpeg-python
+imageio-ffmpeg
+python-dotenv
+audio-recorder-streamlit
+streamlit-float
+pyttsx3
