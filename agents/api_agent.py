@@ -3,7 +3,10 @@ from data_ingestion.api_data_fetcher import get_multiple_stocks_data
 
 app = FastAPI()
 
-@app.get("/run")
-def run_api_agent():
-    tickers = ["TSLA", "AAPL", "005930.KS", "TSM"]  # Add more as needed
+@app.post("/run")
+async def run_api_agent(request: Request):
+    body = await request.json()
+    tickers = body.get("tickers", [])
+    if not tickers:
+        return {"error": "No tickers provided"}
     return get_multiple_stocks_data(tickers)

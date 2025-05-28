@@ -17,4 +17,7 @@ choco
 ffmpeg
 scipy
 newspaper3k
-
+faiss-cpu
+sentence-transformers
+retrying
+langchain

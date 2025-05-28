@@ -11,6 +11,9 @@ async def speak_text(req: Request):
     data = await req.json()
     input_text = data.get("text", "")
 
+    if not input_text:
+        return {"error": "No text provided"}
+
     file_path = "temp_voice.mp3"
     engine.save_to_file(input_text, file_path)
     engine.runAndWait()
