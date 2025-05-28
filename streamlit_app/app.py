@@ -7,7 +7,7 @@ from streamlit_float import *
 import base64
 
 float_init()
-st.title("Multi Agent Finance Assistant 🤖")
+st.title("🤖 Multi Agent Finance Assistant ")
 
 def initialize_session_state():
     if "messages" not in st.session_state:
