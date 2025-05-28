@@ -1,27 +1,34 @@
+# api_data_fetcher.py
 import yfinance as yf
+import pandas as pd
 
-def get_multiple_stocks_data(tickers=["TSLA", "TSM", "005930.KS"], period="5y"):
+def get_multiple_stocks_data(tickers=["TSLA", "TSM", "005930.KS"], period="5d"):
     """
-    Fetch historical data for multiple stocks at once.
-
-    Args:
-        tickers (list): List of ticker symbols.
-        period (str): Period like '5y'.
+    Fetch and return cleaned historical data for multiple stocks.
 
     Returns:
-        dict: Dictionary with ticker as key and historical data as nested dict.
+        dict: JSON-safe dict with cleaned data
     """
     try:
         joined_tickers = " ".join(tickers)
         data = yf.download(joined_tickers, period=period, group_by='ticker')
-        return data.to_dict()
-    except Exception as e:
-        print(f"Error fetching data for tickers {tickers}: {e}")
-        return {}
 
-# Test run
-if __name__ == "__main__":
-    tickers = ["TSLA", "TSM", "005930.KS"]  # Tesla, TSMC, Samsung
-    result = get_multiple_stocks_data(tickers)
-    for key in list(result.keys())[:3]:
-        print(f"{key}: {list(result[key].items())[:1]}")  # Show just one row per key
+        # Handle single ticker edge case
+        if isinstance(data.columns, pd.MultiIndex):
+            result = {}
+            for ticker in tickers:
+                if ticker in data.columns.levels[0]:
+                    df = data[ticker].copy()
+                    df = df.fillna(0).replace([float('inf'), float('-inf')], 0)
+                    result[ticker] = df.reset_index().to_dict(orient="records")
+                else:
+                    result[ticker] = {"error": f"No data found for {ticker}"}
+            return result
+        else:
+            # Single ticker fallback
+            df = data.copy()
+            df = df.fillna(0).replace([float('inf'), float('-inf')], 0)
+            return {tickers[0]: df.reset_index().to_dict(orient="records")}
+
+    except Exception as e:
+        return {"error": f"Exception during fetch: {str(e)}"}

@@ -1,11 +1,15 @@
 import streamlit as st
 import os
-from utils import get_answer, text_to_speech, autoplay_audio, speech_to_text
+import requests
+from utils import text_to_speech, autoplay_audio, speech_to_text
 from audio_recorder_streamlit import audio_recorder
 from streamlit_float import *
+import logging
+logging.getLogger("torch._classes").setLevel(logging.ERROR)
 
-# Float feature initialization
 float_init()
+
+st.title("Multi Agent Finance Assistant 🤖")
 
 def initialize_session_state():
     if "messages" not in st.session_state:
@@ -15,63 +19,56 @@ def initialize_session_state():
 
 initialize_session_state()
 
-st.title("Multi Agent Finance Assistant 🤖")
-
-# Create footer container for the microphone
+# Record audio from mic
 footer_container = st.container()
 with footer_container:
     audio_bytes = audio_recorder()
 
-# Display chat history
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.write(message["content"])
+# Display previous chat
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.write(msg["content"])
 
-# Handle audio input
+# Transcribe audio input and append to session
 if audio_bytes:
-    st.write(f"[DEBUG] Received {len(audio_bytes)} bytes from microphone.")
     with st.spinner("Transcribing..."):
-        webm_file_path = "temp_audio.webm"
-        with open(webm_file_path, "wb") as f:
+        webm_file = "temp_audio.webm"
+        with open(webm_file, "wb") as f:
             f.write(audio_bytes)
-        print(f"[DEBUG] Audio written to: {webm_file_path}")
 
         try:
-            transcript = speech_to_text(webm_file_path)
-            print(f"[DEBUG] Transcription result: {transcript}")
+            user_query = speech_to_text(webm_file)
         except Exception as e:
-            st.error("Transcription failed.")
-            print(f"[ERROR] Transcription failed: {e}")
-            transcript = None
+            st.error("Failed to transcribe audio")
+            user_query = None
 
-        if transcript:
-            st.session_state.messages.append({"role": "user", "content": transcript})
+        if user_query:
+            st.session_state.messages.append({"role": "user", "content": user_query})
             with st.chat_message("user"):
-                st.write(transcript)
-            # Comment out during debugging to inspect audio
-            # os.remove(webm_file_path)
+                st.write(user_query)
 
-# Generate assistant response
-if st.session_state.messages[-1]["role"] != "assistant":
+# If last message is from user, send to orchestrator
+if st.session_state.messages[-1]["role"] == "user":
+    query = st.session_state.messages[-1]["content"]
     with st.chat_message("assistant"):
-        with st.spinner("Thinking 🤔..."):
+        with st.spinner("Processing..."):
             try:
-                final_response = get_answer(st.session_state.messages)
-                print(f"[DEBUG] Gemini response: {final_response}")
+                res = requests.post("http://localhost:8010/process", json={"query": query})
+                narrative = res.json().get("narrative")
             except Exception as e:
-                final_response = "Sorry, I encountered an error while thinking."
-                print(f"[ERROR] LLM error: {e}")
+                narrative = "Failed to get response from backend."
 
-        with st.spinner("Generating audio response..."):
+        # Append response
+        st.session_state.messages.append({"role": "assistant", "content": narrative})
+        st.write(narrative)
+
+        # TTS playback
+        with st.spinner("Generating voice..."):
             try:
-                audio_file = text_to_speech(final_response)
+                audio_file = text_to_speech(narrative)
                 autoplay_audio(audio_file)
                 os.remove(audio_file)
-            except Exception as e:
-                st.error("Failed to generate audio.")
-                print(f"[ERROR] TTS failed: {e}")
-
-        st.write(final_response)
-        st.session_state.messages.append({"role": "assistant", "content": final_response})
+            except:
+                st.error("Failed to convert to speech")
 
 footer_container.float("bottom: 0rem;")
