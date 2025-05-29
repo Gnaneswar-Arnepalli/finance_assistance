@@ -5,15 +5,60 @@ services:
     build: .
     ports:
       - "8501:8501"
+    depends_on:
+      - orchestrator
+      - api_agent
+      - scraping_agent
+      - retriever_agent
+      - analysis_agent
+      - language_agent
+      - voice_agent
 
   api_agent:
-    build: ./agents
-    command: uvicorn api_agent:app --host 0.0.0.0 --port 8001
+    build: .
+    command: uvicorn agents.api_agent:app --host 0.0.0.0 --port 8001
     ports:
       - "8001:8001"
 
+  scraping_agent:
+    build: .
+    command: uvicorn agents.scraping_agent:app --host 0.0.0.0 --port 8002
+    ports:
+      - "8002:8002"
+
+  retriever_agent:
+    build: .
+    command: uvicorn agents.retriever_agent:app --host 0.0.0.0 --port 8003
+    ports:
+      - "8003:8003"
+
+  analysis_agent:
+    build: .
+    command: uvicorn agents.analysis_agent:app --host 0.0.0.0 --port 8005
+    ports:
+      - "8005:8005"
+
+  language_agent:
+    build: .
+    command: uvicorn agents.language_agent:app --host 0.0.0.0 --port 8004
+    ports:
+      - "8004:8004"
+
+  voice_agent:
+    build: .
+    command: uvicorn agents.voice_agent:app --host 0.0.0.0 --port 8006
+    ports:
+      - "8006:8006"
+
   orchestrator:
-    build: ./orchestrator
-    command: uvicorn main:app --host 0.0.0.0 --port 8010
+    build: .
+    command: uvicorn orchestrator.main:app --host 0.0.0.0 --port 8010
     ports:
       - "8010:8010"
+    depends_on:
+      - api_agent
+      - scraping_agent
+      - retriever_agent
+      - analysis_agent
+      - language_agent
+      - voice_agent

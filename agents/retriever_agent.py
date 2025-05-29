@@ -19,7 +19,7 @@ doc_id = 0
 
 # Text splitter
 text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=500,  # Reduced chunk size
+    chunk_size=300,  # Reduced chunk size
     chunk_overlap=50
 )
 
