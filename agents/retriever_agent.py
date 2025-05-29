@@ -1,3 +1,4 @@
+# agents/retriever_agent.py
 from fastapi import FastAPI, Request
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
@@ -6,22 +7,50 @@ import requests
 import faiss
 import numpy as np
 import logging
+import sys
+
+# Configure logging to stdout
+logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+logger = logging.getLogger(__name__)
+
+logger.info("Starting Retriever Agent initialization...")
 
 app = FastAPI()
-logging.basicConfig(level=logging.INFO)
 
-# Initialize model and FAISS index
-model = SentenceTransformer('all-MiniLM-L6-v2')
-dimension = model.get_sentence_embedding_dimension()
-index = faiss.IndexFlatL2(dimension)
+# Initialize model and FAISS index with error handling
+try:
+    logger.info("Loading SentenceTransformer model 'all-MiniLM-L6-v2'...")
+    model = SentenceTransformer('all-MiniLM-L6-v2')
+    logger.info("Model loaded successfully")
+except Exception as e:
+    logger.error(f"Failed to load SentenceTransformer model: {e}")
+    raise
+
+try:
+    logger.info("Initializing FAISS index...")
+    dimension = model.get_sentence_embedding_dimension()
+    index = faiss.IndexFlatL2(dimension)
+    logger.info("FAISS index initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize FAISS index: {e}")
+    raise
+
 documents = []
 doc_id = 0
 
 # Text splitter
-text_splitter = RecursiveCharacterTextSplitter(
-    chunk_size=300,  # Reduced chunk size
-    chunk_overlap=50
-)
+try:
+    logger.info("Initializing text splitter...")
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=300,
+        chunk_overlap=50
+    )
+    logger.info("Text splitter initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize text splitter: {e}")
+    raise
+
+logger.info("Retriever Agent initialization complete")
 
 def scrape_url(url):
     try:
@@ -31,11 +60,11 @@ def scrape_url(url):
         soup = BeautifulSoup(response.text, 'html.parser')
         text = soup.get_text(separator=' ', strip=True)
         if len(text) < 100:
-            logging.warning(f"⚠️ Insufficient content: {url}")
+            logger.warning(f"⚠️ Insufficient content: {url}")
             return None
         return text
     except Exception as e:
-        logging.error(f"❌ Error scraping {url}: {e}")
+        logger.error(f"❌ Error scraping {url}: {e}")
         return None
 
 @app.post("/query")
@@ -57,16 +86,16 @@ async def query(request: Request):
             text = scrape_url(news_url)
             if text:
                 all_texts.append((news_url, text))
-                logging.info(f"✅ Scraped: {news_url}")
+                logger.info(f"✅ Scraped: {news_url}")
         except Exception as e:
-            logging.error(f"[Scrape Error for {ticker}] {e}")
+            logger.error(f"[Scrape Error for {ticker}] {e}")
 
     # Scrape user-provided URLs
     for url in user_urls:
         text = scrape_url(url)
         if text:
             all_texts.append((url, text))
-            logging.info(f"✅ Scraped: {url}")
+            logger.info(f"✅ Scraped: {url}")
 
     # Split texts into chunks
     chunks = []
@@ -83,9 +112,9 @@ async def query(request: Request):
             embeddings = np.array(embeddings).astype('float32')
             index.add(embeddings)
             documents.extend([(chunk, url) for chunk, url in zip(chunks, chunk_urls)])
-            logging.info(f"[INFO] Indexed {len(chunks)} chunks from {len(all_texts)} URLs.")
+            logger.info(f"[INFO] Indexed {len(chunks)} chunks from {len(all_texts)} URLs.")
         except Exception as e:
-            logging.error(f"[Indexing Error] {e}")
+            logger.error(f"[Indexing Error] {e}")
             return {"error": f"Indexing failed: {e}"}
 
     # Query embedding and search
@@ -99,5 +128,5 @@ async def query(request: Request):
                 retrieved.append({"url": url, "snippet": chunk[:200] + "..."})
         return {"chunks": retrieved}
     except Exception as e:
-        logging.error(f"[Query Error] {e}")
+        logger.error(f"[Query Error] {e}")
         return {"error": f"Query failed: {e}"}
