@@ -125,7 +125,7 @@ async def process_query(req: Request):
 
     # Fetch API data
     try:
-        api_data = requests.post("http://api_agent:8001/run", json={"tickers": tickers}, timeout=10).json()
+        api_data = requests.post("http://localhost:8001/run", json={"tickers": tickers}, timeout=10).json()
     except Exception as e:
         api_data = {"error": f"API Agent failed: {e}"}
     logging.info(f"[Orchestrator] API data: {api_data}")
