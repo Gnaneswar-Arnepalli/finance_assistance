@@ -1,4 +1,3 @@
-# agents/retriever_agent.py
 from fastapi import FastAPI, Request
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
@@ -9,7 +8,6 @@ import numpy as np
 import logging
 import sys
 
-# Configure logging to stdout
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
@@ -17,7 +15,10 @@ logger.info("Starting Retriever Agent initialization...")
 
 app = FastAPI()
 
-# Initialize model and FAISS index with error handling
+@app.get("/health")
+async def health():
+    return {"status": "Retriever Agent is running"}
+
 try:
     logger.info("Loading SentenceTransformer model 'all-MiniLM-L6-v2'...")
     model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -38,7 +39,6 @@ except Exception as e:
 documents = []
 doc_id = 0
 
-# Text splitter
 try:
     logger.info("Initializing text splitter...")
     text_splitter = RecursiveCharacterTextSplitter(
@@ -78,7 +78,6 @@ async def query(request: Request):
     if not query and not tickers and not user_urls:
         return {"error": "No query, tickers, or URLs provided"}
 
-    # Scrape news for tickers
     all_texts = []
     for ticker in tickers:
         try:
@@ -90,14 +89,12 @@ async def query(request: Request):
         except Exception as e:
             logger.error(f"[Scrape Error for {ticker}] {e}")
 
-    # Scrape user-provided URLs
     for url in user_urls:
         text = scrape_url(url)
         if text:
             all_texts.append((url, text))
             logger.info(f"✅ Scraped: {url}")
 
-    # Split texts into chunks
     chunks = []
     chunk_urls = []
     for url, text in all_texts:
@@ -105,7 +102,6 @@ async def query(request: Request):
         chunks.extend(split_texts)
         chunk_urls.extend([url] * len(split_texts))
 
-    # Embed and index chunks
     if chunks:
         try:
             embeddings = model.encode(chunks, batch_size=32, show_progress_bar=True)
@@ -117,7 +113,6 @@ async def query(request: Request):
             logger.error(f"[Indexing Error] {e}")
             return {"error": f"Indexing failed: {e}"}
 
-    # Query embedding and search
     try:
         query_embedding = model.encode([query])[0].astype('float32')
         D, I = index.search(np.array([query_embedding]), k=5)

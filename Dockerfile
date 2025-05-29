@@ -1,4 +1,3 @@
-# Dockerfile
 FROM python:3.12-slim
 
 WORKDIR /app
@@ -6,7 +5,6 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 RUN pip install --upgrade pip
 
-# Pre-download sentence-transformers model
 RUN pip install sentence-transformers && \
     python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
 

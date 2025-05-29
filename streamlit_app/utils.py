@@ -5,21 +5,17 @@ from dotenv import load_dotenv
 from google import generativeai as genai
 import whisper
 import imageio_ffmpeg
-import pyttsx3
 import subprocess
 import tempfile
 import numpy as np
-import torch
 import scipy.io.wavfile
 import asyncio
 import sys
 import unicodedata
 import logging
 
-# Suppress torch-related warnings
 logging.getLogger('streamlit').setLevel(logging.ERROR)
 
-# Fix asyncio for Windows and Python 3.13
 if sys.platform == "win32":
     try:
         loop = asyncio.get_event_loop()
@@ -86,8 +82,6 @@ whisper.audio.load_audio = patched_load_audio
 whisper_model = whisper.load_model("base")
 print("[DEBUG] Whisper model loaded.")
 
-engine = pyttsx3.init()
-
 def get_answer(messages):
     prompt_parts = []
     for msg in messages:
@@ -99,7 +93,7 @@ def get_answer(messages):
             prompt_parts.append(f"Assistant: {content}")
     prompt = "\n".join(prompt_parts)
 
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-1.5-flash")
     response = model.generate_content(prompt)
     return response.text
 
@@ -111,10 +105,8 @@ def speech_to_text(audio_data):
         if not transcript:
             raise ValueError("Empty transcription result")
 
-        # Clean encoding issues
         transcript = unicodedata.normalize("NFKD", transcript).encode("ascii", "ignore").decode("ascii")
 
-        # Correct common STT errors
         corrections = {
             "shared tech": "asia tech",
             "shared text": "asia tech",
@@ -130,12 +122,6 @@ def speech_to_text(audio_data):
     except Exception as e:
         print(f"[ERROR] Transcription failed: {e}")
         raise RuntimeError(f"Transcription failed: {e}")
-
-def text_to_speech(input_text):
-    file_path = "temp_audio_play.mp3"
-    engine.save_to_file(input_text, file_path)
-    engine.runAndWait()
-    return file_path
 
 def autoplay_audio(file_path: str):
     with open(file_path, "rb") as f:

@@ -32,7 +32,7 @@ async def generate_response(request: Request):
     """
     
     try:
-        model = genai.GenerativeModel("gemini-2.0-flash")
+        model = genai.GenerativeModel("gemini-1.5-flash")  # Updated model name
         response = model.generate_content(formatted_prompt)
         return {"response": response.text}
     except Exception as e:
