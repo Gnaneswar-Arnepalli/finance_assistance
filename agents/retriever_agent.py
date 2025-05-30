@@ -11,8 +11,6 @@ import sys
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
 logger = logging.getLogger(__name__)
 
-logger.info("Starting Retriever Agent initialization...")
-
 app = FastAPI()
 
 @app.get("/health")
@@ -42,24 +40,22 @@ doc_id = 0
 try:
     logger.info("Initializing text splitter...")
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=300,
-        chunk_overlap=50
+        chunk_size=200,  # Reduced chunk size
+        chunk_overlap=30
     )
     logger.info("Text splitter initialized successfully")
 except Exception as e:
     logger.error(f"Failed to initialize text splitter: {e}")
     raise
 
-logger.info("Retriever Agent initialization complete")
-
 def scrape_url(url):
     try:
         headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, timeout=5)
+        response = requests.get(url, headers=headers, timeout=3)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
         text = soup.get_text(separator=' ', strip=True)
-        if len(text) < 100:
+        if len(text) < 50:
             logger.warning(f"⚠️ Insufficient content: {url}")
             return None
         return text
@@ -104,7 +100,7 @@ async def query(request: Request):
 
     if chunks:
         try:
-            embeddings = model.encode(chunks, batch_size=32, show_progress_bar=True)
+            embeddings = model.encode(chunks, batch_size=16, show_progress_bar=True)  # Reduced batch size
             embeddings = np.array(embeddings).astype('float32')
             index.add(embeddings)
             documents.extend([(chunk, url) for chunk, url in zip(chunks, chunk_urls)])
@@ -115,12 +111,12 @@ async def query(request: Request):
 
     try:
         query_embedding = model.encode([query])[0].astype('float32')
-        D, I = index.search(np.array([query_embedding]), k=5)
+        D, I = index.search(np.array([query_embedding]), k=3)  # Reduced k
         retrieved = []
         for idx in I[0]:
             if idx != -1 and idx < len(documents):
                 chunk, url = documents[idx]
-                retrieved.append({"url": url, "snippet": chunk[:200] + "..."})
+                retrieved.append({"url": url, "snippet": chunk[:150] + "..."})
         return {"chunks": retrieved}
     except Exception as e:
         logger.error(f"[Query Error] {e}")

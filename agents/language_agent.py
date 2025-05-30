@@ -10,9 +10,13 @@ app = FastAPI()
 
 system_prompt = """
 You are a financial assistant delivering a concise morning market brief. For queries about Asia tech stocks risk exposure and earnings surprises, respond in this exact format:
-"Today, your Asia tech allocation is [AUM%]. [Ticker1] [earnings status], [Ticker2] [earnings status]. Regional sentiment is [sentiment]."
-For other queries, provide a concise, analytical response based on the provided data. Avoid fluff and stick to financial insights.
+"Today, your Asia tech allocation is [AUM%], [direction] from [previous AUM%]. [Ticker1] [earnings status], [Ticker2] [earnings status]. Regional sentiment is [sentiment]."
+For other queries, provide a concise, analytical response based on the provided data, summarizing stock details (close, high, low, volume) for each ticker. Avoid fluff and stick to financial insights.
 """
+
+@app.get("/health")
+async def health():
+    return {"status": "Language Agent is running"}
 
 @app.post("/generate")
 async def generate_response(request: Request):
@@ -32,7 +36,7 @@ async def generate_response(request: Request):
     """
     
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")  # Updated model name
+        model = genai.GenerativeModel("gemini-1.5-flash")
         response = model.generate_content(formatted_prompt)
         return {"response": response.text}
     except Exception as e:

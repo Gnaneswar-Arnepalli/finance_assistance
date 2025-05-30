@@ -28,25 +28,27 @@ for msg in st.session_state.messages:
 if audio_bytes:
     with st.spinner("Transcribing..."):
         webm_file = "temp_audio.webm"
-        with open(webm_file, "wb") as f:
-            f.write(audio_bytes)
         try:
+            with open(webm_file, "wb") as f:
+                f.write(audio_bytes)
             user_query = speech_to_text(webm_file)
         except Exception as e:
             st.error(f"Failed to transcribe audio: {e}")
             user_query = None
+        finally:
+            if os.path.exists(webm_file):
+                os.remove(webm_file)
         if user_query:
             st.session_state.messages.append({"role": "user", "content": user_query})
             with st.chat_message("user"):
                 st.write(user_query)
-        os.remove(webm_file)
 
 if st.session_state.messages[-1]["role"] == "user":
     query = st.session_state.messages[-1]["content"]
     with st.chat_message("assistant"):
         with st.spinner("Processing..."):
             try:
-                res = requests.post("http://localhost:8010/process", json={"query": query}, timeout=60)  # Increased timeout to 60 seconds
+                res = requests.post("http://localhost:8010/process", json={"query": query}, timeout=90)
                 res.raise_for_status()
                 result = res.json()
                 narrative = result.get("narrative")

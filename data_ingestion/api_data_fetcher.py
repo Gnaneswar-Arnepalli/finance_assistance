@@ -3,9 +3,11 @@ import yfinance as yf
 import pandas as pd
 import requests
 from dotenv import load_dotenv
+import logging
 
 load_dotenv()
 ALPHA_API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
+logging.basicConfig(level=logging.INFO)
 
 def get_stock_data_yfinance(tickers, period="5d"):
     """
@@ -30,9 +32,10 @@ def get_stock_data_yfinance(tickers, period="5d"):
             df = data.copy().fillna(0).replace([float("inf"), float("-inf")], 0)
             result[tickers[0]] = df.reset_index().to_dict(orient="records")
 
+        logging.info(f"[YFinance] Successfully fetched data for {tickers}")
         return result
     except Exception as e:
-        print(f"[YFinance Error] {e}")
+        logging.error(f"[YFinance Error] {e}")
         return {ticker: {"error": f"YFinance failed: {e}"} for ticker in tickers}
 
 def get_stock_data_alphavantage(ticker, outputsize="compact"):
@@ -50,7 +53,7 @@ def get_stock_data_alphavantage(ticker, outputsize="compact"):
         data = response.json()
 
         if "Time Series (Daily)" not in data:
-            return {ticker: {"error": "AlphaVantage returned no data"}}
+            return {"error": "AlphaVantage returned no data"}
 
         daily_data = data["Time Series (Daily)"]
         formatted_data = [
@@ -65,10 +68,11 @@ def get_stock_data_alphavantage(ticker, outputsize="compact"):
             for date, info in daily_data.items()
         ]
 
-        return {ticker: list(reversed(formatted_data))}
+        logging.info(f"[AlphaVantage] Successfully fetched data for {ticker}")
+        return list(reversed(formatted_data))[:1]  # Return only the latest day
     except Exception as e:
-        print(f"[AlphaVantage Error for {ticker}] {e}")
-        return {ticker: {"error": f"AlphaVantage failed: {e}"}}
+        logging.error(f"[AlphaVantage Error for {ticker}] {e}")
+        return {"error": f"AlphaVantage failed: {e}"}
 
 def get_multiple_stocks_data(tickers, period="5d", fallback_to_alpha=True):
     """
@@ -76,12 +80,22 @@ def get_multiple_stocks_data(tickers, period="5d", fallback_to_alpha=True):
     """
     if not tickers:
         return {"error": "No tickers provided"}
-    
+
     yf_data = get_stock_data_yfinance(tickers, period)
-    if all("error" not in yf_data.get(t, {}) for t in tickers):
+    failed_tickers = [t for t in tickers if "error" in yf_data.get(t, {})]
+
+    if not failed_tickers:
         return yf_data
 
     if fallback_to_alpha:
-        return {t: get_stock_data_alphavantage(t) for t in tickers}
+        alpha_data = {}
+        for ticker in failed_tickers:
+            data = get_stock_data_alphavantage(ticker)
+            alpha_data[ticker] = data
+        # Merge yfinance and Alpha Vantage data
+        for ticker in tickers:
+            if ticker in alpha_data and "error" not in alpha_data[ticker]:
+                yf_data[ticker] = alpha_data[ticker]
+        return yf_data
     else:
         return {"error": "YFinance failed and fallback disabled."}

@@ -5,9 +5,10 @@ services:
     dockerfilePath: ./Dockerfile
     buildContext: .
     branch: main
-    port: 8501  # Explicitly set the external port to 8501
+    port: 8501
+    healthCheckPath: /health
     envVars:
       - key: GEMINI_API_KEY
-        value: AIzaSyCP3AJBooBTEjAB79k4c9BKq5Nw3G8Vq4k
+        sync: false
       - key: ALPHA_VANTAGE_API_KEY
-        value: F7XF9BTX4NYZKE9O
+        sync: false

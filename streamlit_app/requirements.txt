@@ -27,3 +27,4 @@ pandas
 numpy
 fastapi
 gtts
+aiohttp

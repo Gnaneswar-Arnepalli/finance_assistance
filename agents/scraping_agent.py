@@ -8,9 +8,12 @@ app = FastAPI()
 logging.basicConfig(level=logging.INFO)
 
 def is_valid_ticker(ticker):
-    """Validate ticker format."""
     invalid_patterns = [r"^\^", r"\.SA$", r"\.F$", r"\.SG$", r"\.DU$"]
     return ticker and not any(re.match(pattern, ticker) for pattern in invalid_patterns)
+
+@app.get("/health")
+async def health():
+    return {"status": "Scraping Agent is running"}
 
 @app.post("/run")
 async def scrape_news(request: Request):
@@ -26,19 +29,19 @@ async def scrape_news(request: Request):
             logging.info(f"📥 Scraping news for: {ticker}")
             url = f"https://finance.yahoo.com/quote/{ticker}/news/"
             headers = {'User-Agent': 'Mozilla/5.0'}
-            response = requests.get(url, headers=headers, timeout=10)
+            response = requests.get(url, headers=headers, timeout=5)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
             news_items = soup.find_all('h3', class_='Mb(5px)')
             ticker_articles = []
-            for item in news_items[:3]:  # Limit to top 3 articles
+            for item in news_items[:3]:
                 link = item.find('a')
                 if link and link['href']:
                     full_url = f"https://finance.yahoo.com{link['href']}" if link['href'].startswith('/') else link['href']
                     if not full_url.startswith("https://finance.yahoo.com"):
                         continue
                     try:
-                        article_response = requests.get(full_url, headers=headers, timeout=5)
+                        article_response = requests.get(full_url, headers=headers, timeout=3)
                         article_response.raise_for_status()
                         article_soup = BeautifulSoup(article_response.text, 'html.parser')
                         content = article_soup.find('div', class_='caas-body')

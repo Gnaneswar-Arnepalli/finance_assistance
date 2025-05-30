@@ -1,8 +1,6 @@
 import os
 import base64
 import streamlit as st
-from dotenv import load_dotenv
-from google import generativeai as genai
 import whisper
 import imageio_ffmpeg
 import subprocess
@@ -26,10 +24,6 @@ if sys.platform == "win32":
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
-load_dotenv()
-print("[DEBUG] Gemini API configured.")
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
 os.environ["PATH"] = os.path.dirname(ffmpeg_path) + os.pathsep + os.environ.get("PATH", "")
@@ -81,21 +75,6 @@ whisper.audio.load_audio = patched_load_audio
 
 whisper_model = whisper.load_model("base")
 print("[DEBUG] Whisper model loaded.")
-
-def get_answer(messages):
-    prompt_parts = []
-    for msg in messages:
-        role = msg["role"]
-        content = msg["content"]
-        if role == "user":
-            prompt_parts.append(f"User: {content}")
-        elif role == "assistant":
-            prompt_parts.append(f"Assistant: {content}")
-    prompt = "\n".join(prompt_parts)
-
-    model = genai.GenerativeModel("gemini-1.5-flash")
-    response = model.generate_content(prompt)
-    return response.text
 
 def speech_to_text(audio_data):
     print(f"[DEBUG] Transcribing audio file: {audio_data}")
