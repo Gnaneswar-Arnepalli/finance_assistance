@@ -6,8 +6,8 @@ services:
     buildContext: .
     branch: main
     port: 8501
-    healthCheckPath: /health
-    healthCheckTimeout: 120
+    healthCheckPath: /
+    healthCheckTimeout: 180
     envVars:
       - key: GEMINI_API_KEY
         sync: false

@@ -11,9 +11,9 @@ streamlit-float
 pyttsx3
 yfinance
 unstructured
-beautifulsoup4 
+beautifulsoup4
 requests
-choco 
+choco
 ffmpeg
 scipy
 newspaper3k
@@ -28,3 +28,8 @@ numpy
 fastapi
 gtts
 aiohttp
+starlette
+psutil
+pydantic
+websockets
+nest_asyncio
