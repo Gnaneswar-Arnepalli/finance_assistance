@@ -1,123 +1,70 @@
 from fastapi import FastAPI, Request
-from langchain.text_splitter import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
-from bs4 import BeautifulSoup
-import requests
 import faiss
 import numpy as np
+from typing import List, Dict
 import logging
-import sys
-
-logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-logger = logging.getLogger(__name__)
 
 app = FastAPI()
+logging.basicConfig(level=logging.INFO)
+
+# Initialize model and FAISS index
+model = SentenceTransformer('all-MiniLM-L6-v2')
+dimension = model.get_sentence_embedding_dimension()
+index = faiss.IndexFlatL2(dimension)
+chunks = []
+chunk_to_doc = {}
 
 @app.get("/health")
 async def health():
     return {"status": "Retriever Agent is running"}
 
-try:
-    logger.info("Loading SentenceTransformer model 'all-MiniLM-L6-v2'...")
-    model = SentenceTransformer('all-MiniLM-L6-v2')
-    logger.info("Model loaded successfully")
-except Exception as e:
-    logger.error(f"Failed to load SentenceTransformer model: {e}")
-    raise
+@app.post("/index")
+async def index_documents(req: Request):
+    data = await req.json()
+    documents = data.get("documents", [])
+    if not documents:
+        return {"status": "No documents provided"}
 
-try:
-    logger.info("Initializing FAISS index...")
-    dimension = model.get_sentence_embedding_dimension()
-    index = faiss.IndexFlatL2(dimension)
-    logger.info("FAISS index initialized successfully")
-except Exception as e:
-    logger.error(f"Failed to initialize FAISS index: {e}")
-    raise
+    global chunks, chunk_to_doc
+    new_chunks = []
+    for doc in documents:
+        content = doc.get("content", "")
+        source = doc.get("source", "unknown")
+        # Split into smaller chunks for memory efficiency
+        for i in range(0, len(content), 100):
+            chunk = content[i:i+100]
+            new_chunks.append(chunk)
+            chunk_to_doc[len(chunks) + len(new_chunks) - 1] = source
 
-documents = []
-doc_id = 0
-
-try:
-    logger.info("Initializing text splitter...")
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=200,  # Reduced chunk size
-        chunk_overlap=30
-    )
-    logger.info("Text splitter initialized successfully")
-except Exception as e:
-    logger.error(f"Failed to initialize text splitter: {e}")
-    raise
-
-def scrape_url(url):
-    try:
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, timeout=3)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
-        text = soup.get_text(separator=' ', strip=True)
-        if len(text) < 50:
-            logger.warning(f"⚠️ Insufficient content: {url}")
-            return None
-        return text
-    except Exception as e:
-        logger.error(f"❌ Error scraping {url}: {e}")
-        return None
+    if new_chunks:
+        # Encode in smaller batches
+        embeddings = model.encode(new_chunks, batch_size=8, show_progress_bar=True)
+        embeddings = np.array(embeddings).astype('float32')
+        index.add(embeddings)
+        chunks.extend(new_chunks)
+        logging.info(f"[Retriever] Indexed {len(new_chunks)} chunks")
+    return {"status": "Indexed successfully"}
 
 @app.post("/query")
-async def query(request: Request):
-    global documents, index, doc_id
-    body = await request.json()
-    query = body.get("query", "")
-    tickers = body.get("tickers", [])
-    user_urls = body.get("user_urls", [])
+async def query(req: Request):
+    data = await req.json()
+    query = data.get("query", "")
+    tickers = data.get("tickers", [])
+    user_urls = data.get("user_urls", [])
 
-    if not query and not tickers and not user_urls:
-        return {"error": "No query, tickers, or URLs provided"}
+    if not query or not chunks:
+        return {"chunks": [], "sources": []}
 
-    all_texts = []
-    for ticker in tickers:
-        try:
-            news_url = f"https://finance.yahoo.com/quote/{ticker}/news/"
-            text = scrape_url(news_url)
-            if text:
-                all_texts.append((news_url, text))
-                logger.info(f"✅ Scraped: {news_url}")
-        except Exception as e:
-            logger.error(f"[Scrape Error for {ticker}] {e}")
+    query_embedding = model.encode([query], batch_size=1)[0].astype('float32')
+    D, I = index.search(np.array([query_embedding]), k=2)  # Reduced k for memory
 
-    for url in user_urls:
-        text = scrape_url(url)
-        if text:
-            all_texts.append((url, text))
-            logger.info(f"✅ Scraped: {url}")
+    retrieved_chunks = []
+    sources = []
+    for idx in I[0]:
+        if idx != -1:
+            retrieved_chunks.append(chunks[idx])
+            sources.append(chunk_to_doc.get(idx, "unknown"))
 
-    chunks = []
-    chunk_urls = []
-    for url, text in all_texts:
-        split_texts = text_splitter.split_text(text)
-        chunks.extend(split_texts)
-        chunk_urls.extend([url] * len(split_texts))
-
-    if chunks:
-        try:
-            embeddings = model.encode(chunks, batch_size=16, show_progress_bar=True)  # Reduced batch size
-            embeddings = np.array(embeddings).astype('float32')
-            index.add(embeddings)
-            documents.extend([(chunk, url) for chunk, url in zip(chunks, chunk_urls)])
-            logger.info(f"[INFO] Indexed {len(chunks)} chunks from {len(all_texts)} URLs.")
-        except Exception as e:
-            logger.error(f"[Indexing Error] {e}")
-            return {"error": f"Indexing failed: {e}"}
-
-    try:
-        query_embedding = model.encode([query])[0].astype('float32')
-        D, I = index.search(np.array([query_embedding]), k=3)  # Reduced k
-        retrieved = []
-        for idx in I[0]:
-            if idx != -1 and idx < len(documents):
-                chunk, url = documents[idx]
-                retrieved.append({"url": url, "snippet": chunk[:150] + "..."})
-        return {"chunks": retrieved}
-    except Exception as e:
-        logger.error(f"[Query Error] {e}")
-        return {"error": f"Query failed: {e}"}
+    logging.info(f"[Retriever] Retrieved {len(retrieved_chunks)} chunks for query: {query}")
+    return {"chunks": retrieved_chunks, "sources": sources}

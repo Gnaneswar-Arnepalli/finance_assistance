@@ -1,7 +1,11 @@
 #!/bin/bash
 # Log initial memory usage
 echo "Initial memory usage:"
-free -m
+if ! command -v free >/dev/null 2>&1; then
+    echo "free command not available, skipping memory check"
+else
+    free -m
+fi
 
 # Start Streamlit app on port 8501 (Render's expected port)
 echo "Starting Streamlit App on port 8501"
@@ -9,7 +13,7 @@ streamlit run streamlit_app/app.py --server.port=8501 --server.address=0.0.0.0 &
 
 # Wait for Streamlit to initialize
 echo "Waiting for Streamlit to initialize..."
-sleep 45
+sleep 90
 
 # Start all agents
 echo "Starting API Agent on port 8001"
@@ -34,19 +38,18 @@ echo "Starting Orchestrator on port 8010"
 uvicorn orchestrator.main:app --host 0.0.0.0 --port 8010 &
 
 echo "Waiting for services to initialize..."
-sleep 15
+sleep 30
 
-# Monitor memory usage and health of all services
+# Monitor health of critical services
 while true; do
-    echo "Memory usage:"
-    free -m
-    echo "Checking service health..."
+    echo "Checking critical service health..."
     curl -s http://localhost:8010/health || echo "Orchestrator health check failed"
-    curl -s http://localhost:8001/health || echo "API Agent health check failed"
-    curl -s http://localhost:8002/health || echo "Scraping Agent health check failed"
     curl -s http://localhost:8003/health || echo "Retriever Agent health check failed"
-    curl -s http://localhost:8004/health || echo "Language Agent health check failed"
-    curl -s http://localhost:8005/health || echo "Analysis Agent health check failed"
-    curl -s http://localhost:8006/health || echo "Voice Agent health check failed"
+    if ! command -v free >/dev/null 2>&1; then
+        echo "free command not available, skipping memory check"
+    else
+        echo "Memory usage:"
+        free -m
+    fi
     sleep 60
 done

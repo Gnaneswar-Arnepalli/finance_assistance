@@ -1,12 +1,13 @@
 services:
   - type: web
-    name: finance-assistance
+    name: finance-assistance-10th
     env: docker
     dockerfilePath: ./Dockerfile
     buildContext: .
     branch: main
     port: 8501
     healthCheckPath: /health
+    healthCheckTimeout: 120
     envVars:
       - key: GEMINI_API_KEY
         sync: false
